@@ -4,6 +4,7 @@ import { ListGroup, Button, Dropdown, InputGroup } from 'bootstrap-4-react';
 import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import _ from 'lodash';
 const host = 'http://localhost:3001'
 
 const Dashboard = () => {
@@ -16,12 +17,33 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   const handleLogout = () => {
+    localStorage.removeItem('TOKEN')
     navigate('/');
   };
 
-  const handleClick = (index) => {
+  const handleClick = async (index) => {
+    var group_id = listGroup[index].group_id
+    setMessages([])
     setActiveIndex(index);
-    setSelectedGroup(listGroup[index].group_id)
+    setSelectedGroup(group_id)
+    const TOKEN = localStorage.getItem('TOKEN')
+    let resp = await axios.get(`${host}/api/list_messages?group_id=${group_id}`, {
+      headers: {
+        'Authorization': `Bearer ${TOKEN}`
+      }
+    })
+    var new_messages = []
+    if(resp.data.data.length > 0){
+      for(let item of resp.data.data){
+        if(_.findIndex(messages, msg => msg.id === item.message_id) < 0){
+          new_messages.push({
+            id: item.message_id,
+            text: item.text
+          })
+        }
+      }
+      setMessages([...new_messages])
+    }
   };
 
   const handleSendMessage = async () => {
@@ -131,13 +153,17 @@ const Dashboard = () => {
   useEffect(() => {
     try {
       const TOKEN = localStorage.getItem('TOKEN')
-      axios.get(`${host}/api/list_groups`, {
-        headers: {
-          'Authorization': `Bearer ${TOKEN}`
-        }
-      }).then(res => {
-        setListGroup(res.data.data)
-      })
+      if(!TOKEN){
+        navigate('/');
+      }else {
+        axios.get(`${host}/api/list_groups`, {
+          headers: {
+            'Authorization': `Bearer ${TOKEN}`
+          }
+        }).then(res => {
+          setListGroup(res.data.data)
+        })
+      }
     } catch (error) {
       console.log(error);
     }
@@ -165,7 +191,7 @@ const Dashboard = () => {
         activeIndex != null && 
         <div className="container mt-4" style={{border: '1px solid', padding: '25px'}}>
           <ListGroup>
-              {messages.map((message) => (
+              {messages && messages.length > 0 && messages.map((message) => (
                   <ListGroup.Item key={message.id}>
                       <div className="d-flex justify-content-between align-items-center">
                           <span>{message.text}</span>

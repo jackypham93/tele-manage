@@ -100,6 +100,7 @@ app.post('/api/send_message', authenticateToken, async (req, res) => {
     try {
       const { group_id, message } = req.body
       var result = await bot.sendMessage(group_id, message);
+      await pool.query('INSERT INTO messages (text, group_id, message_id, created_by) VALUES ($1, $2, $3, $4)', [message, group_id, result.message_id, req.user.id]);
       res.json({
           message_id: result.message_id,
           message: "success"
@@ -120,6 +121,7 @@ app.put('/api/update_message', authenticateToken, async (req, res) => {
       chat_id: group_id,
       message_id: message_id
     });
+    await pool.query('UPDATE messages SET text = $1 WHERE message_id = $2', [new_text, message_id]);
     res.json({
       message: "success"
     })
@@ -137,12 +139,21 @@ app.delete('/api/delete_message', authenticateToken, async (req, res) => {
     }
     const { group_id, msg_id } = req.query
     await bot.deleteMessage(group_id, msg_id)
+    await pool.query('DELETE FROM messages WHERE message_id = $1', [msg_id]);
     res.json({
       message: "success"
     })
   } catch (error) {
     res.status(500).send('Server error');
   }
+})
+
+app.get('/api/list_messages', authenticateToken, async (req, res) => {
+  const { group_id } = req.query
+  const result = await pool.query('SELECT * FROM messages WHERE group_id = $1', [group_id]);
+  res.json({
+    data: result.rows
+  })
 })
 
 app.listen(port, () => {
